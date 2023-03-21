@@ -31,13 +31,13 @@ jobs:
         sudo cp /tmp/inso /usr/local/bin/    
 
     - name: Export OpenAPI Spec
-      run: inso export spec "Pizza Orders" -o pizza.yaml
+      run: inso export spec "pizza-orders.yaml" -o pizza.yaml
 
     - name: Lint OpenAPI Spec
-      run: inso lint spec "Pizza Orders"
+      run: inso lint spec "pizza-orders.yaml"
       
     - name: Generate Kong declarative configuration from Spec
-      run: inso generate config "Pizza Orders" --type declarative --tags pizza-orders-1_0 -o pizza-orders-1_0_raw.yaml
+      run: inso generate config "pizza-orders.yaml" --type declarative --tags pizza-orders-1_0 -o pizza-orders-1_0_raw.yaml
       
     - name: Upgrade Version of Kong declarative configuration
       run: deck convert --input-file pizza-orders-1_0_raw.yaml --from kong-gateway-2.x --to kong-gateway-3.x --output-file pizza-orders-1_0.yaml
