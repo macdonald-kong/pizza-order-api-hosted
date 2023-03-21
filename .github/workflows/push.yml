@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: 
+      - main   
+      
+jobs:
+
+  deploy-api:
+  
+    runs-on: ubuntu-22.04
+    
+    name: Deploy API to Kong Control Plane
+    
+    steps:        
+    
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Install decK tool
+      run: |
+        curl -sL https://github.com/kong/deck/releases/download/v1.16.1/deck_1.16.1_linux_amd64.tar.gz -o deck.tar.gz
+        tar -xf deck.tar.gz -C /tmp
+        sudo cp /tmp/deck /usr/local/bin/
+      
+    - name: Install Inso CLI tool
+      run: |
+        curl -sL https://github.com/Kong/insomnia/releases/download/lib%403.7.0/inso-linux-3.7.0.tar.xz -o inso.tar.xz
+        tar -xf inso.tar.xz -C /tmp
+        sudo cp /tmp/inso /usr/local/bin/    
+
+    - name: Export OpenAPI Spec
+      run: inso export spec "Pizza Orders" -o pizza.yaml
+
+    - name: Lint OpenAPI Spec
+      run: inso lint spec "Pizza Orders"
+      
+    - name: Generate Kong declarative configuration from Spec
+      run: inso generate config "Pizza Orders" --type declarative --tags pizza-orders-1_0 -o pizza-orders-1_0_raw.yaml
+      
+    - name: Upgrade Version of Kong declarative configuration
+      run: deck convert --input-file pizza-orders-1_0_raw.yaml --from kong-gateway-2.x --to kong-gateway-3.x --output-file pizza-orders-1_0.yaml
+      
+    - name: 'Upload Kong Config Artifact'
+      uses: actions/upload-artifact@v3
+      with:
+        name: pizza-order-api-kong-config
+        path: pizza-orders-1_0.yaml
+        
+    - name: Validate Kong declarative configuration
+      run: deck validate --state pizza-orders-1_0.yaml
+      
+    - name: Diff declarative config
+      run: deck diff --state pizza-orders-1_0.yaml --kong-addr ${{ secrets.KONG_API }} --headers ${{ secrets.KONG_ADMIN }} --workspace default
+      
+    - name: Backup Existing Kong Configuration
+      run: deck dump --kong-addr ${{ secrets.KONG_API }} --headers ${{ secrets.KONG_ADMIN }} --workspace default
+      
+    - name: 'Upload Kong Config Backup Artifact'
+      uses: actions/upload-artifact@v3
+      with:
+        name: kong-backup
+        path: kong.yaml
+        
+    - name: Deploy declarative config to default workspace
+      run: deck sync --state pizza-orders-1_0.yaml --kong-addr ${{ secrets.KONG_API }} --headers ${{ secrets.KONG_ADMIN }} --workspace default
+
+    - name: Run Unit Tests
+      run: inso run test "Test Pizza Order Demo" --env demo --ci
+
+    - name: Publish Spec to Dev Portal
+      run: curl -X POST ${{ secrets.KONG_API }}/default/files -F "path=specs/pizza.yaml" -F "contents=@./pizza.yaml" -H ${{ secrets.KONG_ADMIN }}
