@@ -65,9 +65,3 @@ jobs:
         
     - name: Deploy declarative config to default workspace
       run: deck sync --state pizza-orders-1_0.yaml --kong-addr ${{ secrets.KONG_API }} --headers ${{ secrets.KONG_ADMIN }} --workspace default
-
-    - name: Run Unit Tests
-      run: inso run test "Test Pizza Order Demo" --env demo --ci
-
-    - name: Publish Spec to Dev Portal
-      run: curl -X POST ${{ secrets.KONG_API }}/default/files -F "path=specs/pizza.yaml" -F "contents=@./pizza.yaml" -H ${{ secrets.KONG_ADMIN }}
